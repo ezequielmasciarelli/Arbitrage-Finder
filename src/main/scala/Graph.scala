@@ -3,7 +3,7 @@ import cats.Semigroup
 
 object Graph {
 
-  type GraphNode = (Double, Graph)
+  type GraphNode = (Double,Graph)
 
   /**
    * This type represents a path from an initial vertex to itself through the edges (cycle)
@@ -30,7 +30,7 @@ object Graph {
   /**
    * Same as path for for all the Nodes in the graph
    */
-  def allNodesPaths(tree: Graph): Map[Currency, List[List[(Double, Graph)]]] = Graph.nodes(tree).view.mapValues(Graph.paths).toMap
+  def allNodesPaths(tree: Graph): Map[Currency, List[List[GraphNode]]] = Graph.nodes(tree).view.mapValues(Graph.paths).toMap
 
   /**
    * Get all the nodes from the graph
@@ -41,9 +41,9 @@ object Graph {
    * The g function is necessary for getting all the paths, since we need to keep track of the current one and apply a special case when we find a loop in the graph
    * however, for every other operation where the paths are not needed (like getting the nodes), this can be replaced by an identity function
    */
-  def fold[A: Semigroup](tree: Graph)(seed: A)(f: Graph => A => A)(g: List[(Double, Graph)] => A => A): A = {
+  def fold[A: Semigroup](tree: Graph)(seed: A)(f: Graph => A => A)(g: List[GraphNode] => A => A): A = {
 
-    def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: List[(Double, Graph)], seed0: A, isHead: Boolean): A = {
+    def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: List[GraphNode], seed0: A, isHead: Boolean): A = {
       if (tree.currency == tail.currency && !isHead) g(currentPath)(seed0)
       else f(tail)(tail.neighbours.map {
         case (exchange, childTree) =>
@@ -58,7 +58,7 @@ object Graph {
   /**
    * Gets all the possible paths between a node and itself
    */
-  def paths(tree: Graph): List[List[(Double, Graph)]] = fold(tree)(List.empty[List[(Double, Graph)]])(_ => identity)(list => seed => seed ++ List(list))
+  def paths(tree: Graph): List[List[GraphNode]] = fold(tree)(List.empty[List[GraphNode]])(_ => identity)(list => seed => seed ++ List(list))
 
   class Graph(currency0: Currency, neighbours0: => List[GraphNode]) {
     lazy val neighbours: List[GraphNode] = neighbours0
