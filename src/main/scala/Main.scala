@@ -64,19 +64,14 @@ object Main extends IOApp.Simple {
 
       def pathAux(tail: LazyTree, alreadyVisited: List[Currency], currentList: List[Currency], totalLists: List[List[Currency]], isHead: Boolean): List[List[Currency]] = {
         if (tree.currency == tail.currency && !isHead) totalLists ++ List(currentList)
-        else tail.neighbours match {
-          case xs => xs.flatMap {
+        else tail.neighbours.flatMap {
             case (_, childTree) =>
               if (alreadyVisited.contains(childTree.currency)) {
                 List.empty
               }
-              else {
-                val newCurrent = currentList ++ List(childTree.currency)
-                val newVisited = alreadyVisited ++ List(childTree.currency)
-                pathAux(childTree, newVisited, newCurrent, totalLists, isHead = false)
-              }
+              else
+                pathAux(childTree, alreadyVisited ++ List(childTree.currency), currentList ++ List(childTree.currency), totalLists, isHead = false)
           }
-        }
       }
 
       val r = pathAux(tree, List.empty, List(tree.currency), List.empty, isHead = true)
