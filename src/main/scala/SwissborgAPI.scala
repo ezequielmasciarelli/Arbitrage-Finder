@@ -1,4 +1,4 @@
-import cats.effect.{Async, IO}
+import cats.effect.Async
 import cats.implicits._
 import io.circe.Decoder
 import org.http4s.circe.jsonOf

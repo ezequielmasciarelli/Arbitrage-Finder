@@ -28,41 +28,60 @@ object Graph {
   def apply(currency: Currency, neighbours: => GraphPath) = new Graph(currency, neighbours)
 
   /**
-   * Same as path for for all the Nodes in the graph
-   */
-  def allNodesPaths(tree: Graph): Map[Currency, List[GraphPath]] = Graph.nodes(tree).view.mapValues(Graph.paths).toMap
-
-  /**
    * Get all the nodes from the graph
    */
-  def nodes(tree: Graph): Map[Currency, Graph] = fold(tree)(Map.empty[Currency, Graph])(c => seed => if (seed.contains(c.currency)) seed else seed + (c.currency -> c))(_ => identity)(_ ++ _)
+  def vertexes(graph: Graph): Map[Currency, Graph] = fold(graph)(Map.empty[Currency, Graph])(c => seed => if (seed.contains(c.currency)) seed else seed + (c.currency -> c))(_ => identity)(_ ++ _)
+
+  /**
+   * Gets all the possible paths between a node and itself
+   */
+  def paths(graph: Graph): List[GraphPath] = fold(graph)(List.empty[GraphPath])(_ => identity)(list => seed => seed ++ List(list))
+
+  /**
+   * Same as path for for all the Nodes in the graph
+   */
+  def allNodesPaths(graph: Graph): Map[Currency, List[GraphPath]] = Graph.vertexes(graph).view.mapValues(Graph.paths).toMap
+
+  /**
+   * Get all the currencies, used only on the tests
+   */
+  def currencies(graph: Graph): Set[Currency] = fold(graph)(Set.empty[Currency])(c => seed => seed + c.currency)(_ => identity)
 
   /**
    * The g function is necessary for getting all the paths, since we need to keep track of the current one and apply a special case when we find a loop in the graph
    * however, for every other operation where the paths are not needed (like getting the nodes), this can be replaced by an identity function
    */
-  def fold[A: Semigroup](tree: Graph)(seed: A)(f: Graph => A => A)(g: GraphPath => A => A): A = {
+  def fold[A: Semigroup](graph: Graph)(seed: A)(f: Graph => A => A)(g: GraphPath => A => A): A = {
 
     def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: GraphPath, seed0: A, isHead: Boolean): A = {
-      if (tree.currency == tail.currency && !isHead) g(currentPath)(seed0)
+      if (graph.currency == tail.currency && !isHead) g(currentPath)(seed0)
       else f(tail)(tail.neighbours.map {
-        case (exchange, childTree) =>
-          if (alreadyVisited.contains(childTree.currency)) seed
-          else foldAux(childTree, alreadyVisited ++ List(childTree.currency), currentPath ++ List((exchange, childTree)), seed0, isHead = false)
+        case (exchange, childGraph) =>
+          if (alreadyVisited.contains(childGraph.currency)) seed
+          else foldAux(childGraph, alreadyVisited ++ List(childGraph.currency), currentPath ++ List((exchange, childGraph)), seed0, isHead = false)
       }.reduce(Semigroup[A].combine))
     }
 
-    foldAux(tree, List.empty, List((1, tree)), seed, isHead = true)
+    foldAux(graph, List.empty, List((1, graph)), seed, isHead = true)
   }
 
-  /**
-   * Gets all the possible paths between a node and itself
+  /** *
+   * Sums all the paths exchanges. A number greater than 1 means that we found an Arbitrage
    */
-  def paths(tree: Graph): List[GraphPath] = fold(tree)(List.empty[GraphPath])(_ => identity)(list => seed => seed ++ List(list))
+  def sumPathExchanges: GraphPath => Double = _.map(_._1).fold(1: Double)(_ * _)
+
+  def showPath(path: GraphPath): String = path.map(_._2).map(_.currency.value).mkString("-")
 
   class Graph(currency0: Currency, neighbours0: => GraphPath) {
     lazy val neighbours: GraphPath = neighbours0
     lazy val currency: Currency = currency0
+  }
+
+  /**
+   * Gets all the paths where you end up with more money than when you began
+   */
+  def getArbitragePaths(allPaths: Map[Currency, List[GraphPath]]): List[(Double, GraphPath)] = {
+    allPaths.values.flatten.toList.map(path => (sumPathExchanges(path), path)).filter(_._1 > 1).sortBy(_._1)
   }
 
 }
