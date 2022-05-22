@@ -58,14 +58,9 @@ object Main extends IOApp.Simple {
             else foldAux(childTree, alreadyVisited ++ List(childTree.currency), currentPath ++ List(childTree.currency), seed0, isHead = false)
         }.reduce(Semigroup[A].combine))
       }
-
-      val r = foldAux(tree, List.empty, List(tree.currency), seed, isHead = true)
-      r
+      foldAux(tree, List.empty, List(tree.currency), seed, isHead = true)
     }
 
-    /**
-     * ESTA FUNCION RECORRE TODOS LOS EDGES DEL GRAFO, EN TOTAL 16 EDGES QUE CONECTAN CADA NODO (VERTEX)
-     */
     def currencies(tree: LazyTree): Set[Currency] = fold(tree)(Set.empty[Currency])(c => seed => seed + c.currency)(_ => identity)
 
     /** WHY MAPs ARE NOT SEMIGROUPS? */
