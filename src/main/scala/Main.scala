@@ -48,17 +48,17 @@ object Main extends IOApp.Simple {
     /**
      * The g function is necesary for getting all the paths, since we need to keep track of the current and apply a special case when we find a loop in the graph
      */
-    def fold[A: Semigroup](tree: LazyTree)(seed: A)(f: LazyTree => A => A)(g: List[Currency] => A => A): A = {
+    def fold[A: Semigroup](tree: LazyTree)(seed: A)(f: LazyTree => A => A)(g: List[(String,LazyTree)] => A => A): A = {
 
-      def foldAux(tail: LazyTree, alreadyVisited: List[Currency], currentPath: List[Currency], seed0: A, isHead: Boolean): A = {
+      def foldAux(tail: LazyTree, alreadyVisited: List[Currency], currentPath: List[(String,LazyTree)], seed0: A, isHead: Boolean): A = {
         if (tree.currency == tail.currency && !isHead) g(currentPath)(seed0)
         else f(tail)(tail.neighbours.map {
-          case (_, childTree) =>
+          case (exchange, childTree) =>
             if (alreadyVisited.contains(childTree.currency)) seed
-            else foldAux(childTree, alreadyVisited ++ List(childTree.currency), currentPath ++ List(childTree.currency), seed0, isHead = false)
+            else foldAux(childTree, alreadyVisited ++ List(childTree.currency), currentPath ++ List((exchange,childTree)), seed0, isHead = false)
         }.reduce(Semigroup[A].combine))
       }
-      foldAux(tree, List.empty, List(tree.currency), seed, isHead = true)
+      foldAux(tree, List.empty, List(("0",tree)), seed, isHead = true)
     }
 
     def currencies(tree: LazyTree): Set[Currency] = fold(tree)(Set.empty[Currency])(c => seed => seed + c.currency)(_ => identity)
@@ -69,12 +69,12 @@ object Main extends IOApp.Simple {
     /**
      * Gets all the possible paths between a node and itself
      */
-    def paths(tree: LazyTree): List[List[Currency]] = fold(tree)(List.empty[List[Currency]])(_ => identity)(list => seed => seed ++ List(list))
+    def paths(tree: LazyTree): List[List[(String,LazyTree)]] = fold(tree)(List.empty[List[(String,LazyTree)]])(_ => identity)(list => seed => seed ++ List(list))
 
     /**
      * Same as path for for all the Nodes in the graph
      */
-    def allNodesPaths(tree:LazyTree): Map[Currency,List[List[Currency]]] = LazyTree.nodes(tree).view.mapValues(LazyTree.paths).toMap
+    def allNodesPaths(tree:LazyTree): Map[Currency,List[List[(String,LazyTree)]]] = LazyTree.nodes(tree).view.mapValues(LazyTree.paths).toMap
 
   }
 
@@ -107,7 +107,7 @@ object Main extends IOApp.Simple {
       rates <- EitherT(currenciesProgram)
       graph <- EitherT(IO.pure(Right(toTree(rates))): IO[Either[String, LazyTree]])
       nodes <- EitherT(IO.pure(Right(LazyTree.nodes(graph))): IO[Either[String, Map[Currency,LazyTree]]])
-      allPaths <- EitherT(IO.pure(Right(LazyTree.allNodesPaths(graph))): IO[Either[String, Map[Currency,List[List[Currency]]]]])
+      allPaths <- EitherT(IO.pure(Right(LazyTree.allNodesPaths(graph))): IO[Either[String, Map[Currency,List[List[(String,LazyTree)]]]]])
       asd = 1
     } yield ()).value.void *> IO.println("DONE")
   }
