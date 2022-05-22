@@ -48,19 +48,33 @@ object Main extends IOApp.Simple {
   object LazyTree {
     def apply(currency: Currency, neighbours: => List[(String, LazyTree)]) = new LazyTree(currency, neighbours)
 
-    def path(tree: LazyTree): List[Currency] = {
-      def pathAux(tail: List[(String, LazyTree)], visitedCurrencies: List[Currency]): List[Currency] = {
-        tail match {
-          case (_, acc) :: _ if acc.currency == tree.currency => List(acc.currency)
-          case (_, acc) :: _ => List(acc.currency) ++ pathAux(acc.neighbours.filterNot(cc => visitedCurrencies.contains(cc._2.currency)), visitedCurrencies ++ List(acc.currency))
-        }
+    def fold[A, B](tree: LazyTree)(seed: A)(f: Currency => List[A] => A): A = {
+
+      def foldAux(tail: LazyTree, alreadyVisited: List[Currency], currentList: List[Currency], seed0: A, isHead: Boolean): A = {
+        if (tree.currency == tail.currency && !isHead) seed0
+        else f(tail.currency)(tail.neighbours.map {
+          case (_, childTree) =>
+            if (alreadyVisited.contains(childTree.currency)) seed0
+            else foldAux(childTree, alreadyVisited ++ List(childTree.currency), currentList ++ List(childTree.currency), seed0, isHead = false)
+        })
       }
 
-      List(tree.currency) ++ pathAux(tree.neighbours, List.empty)
+      val r = foldAux(tree, List.empty, List(tree.currency), seed, isHead = true)
+      r
     }
 
+    /**
+     * ESTA FUNCION RECORRE TODOS LOS EDGES DEL GRAFO, EN TOTAL 16 EDGES QUE CONECTAN CADA NODO (VERTEX)
+     */
+    def currencies(tree: LazyTree): Set[Currency] = fold(tree)(Set.empty[Currency])(c => seed => (c::seed.flatten).toSet)
+    //def currencies2(tree: LazyTree): String = fold(tree)("")(c => seed => c.value ++ seed.mkString)(a => "")
 
-    def paths(tree: LazyTree): List[List[Currency]] = {
+    def minoPaths(tree: LazyTree): List[List[Currency]] = fold(tree)(List.empty[List[Currency]])(c => seed => {
+      val l =seed.flatten
+      l.map(c :: _)
+    })
+
+    def paths[A, B](tree: LazyTree): List[List[Currency]] = {
 
       def pathAux(tail: LazyTree, alreadyVisited: List[Currency], currentList: List[Currency], totalLists: List[List[Currency]], isHead: Boolean): List[List[Currency]] = {
         if (tree.currency == tail.currency && !isHead) totalLists ++ List(currentList)
@@ -103,7 +117,8 @@ object Main extends IOApp.Simple {
   override def run: IO[Unit] = (for {
     currencies <- EitherT(currenciesProgram)
     tree <- EitherT(IO.pure(Right(toTree(currencies))): IO[Either[String, LazyTree]])
-    path <- EitherT(IO.pure(Right(LazyTree.paths(tree))): IO[Either[String, List[List[Currency]]]])
+    path <- EitherT(IO.pure(Right(LazyTree.currencies(tree))): IO[Either[String, Set[Currency]]])
+    path2 <- EitherT(IO.pure(Right(LazyTree.minoPaths(tree))): IO[Either[String, List[List[Currency]]]])
     _ <- EitherT(IO.println(tree).map(Right(_)): IO[Either[String, Unit]])
   } yield ()).value.void
 }
