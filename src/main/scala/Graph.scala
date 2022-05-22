@@ -13,7 +13,7 @@ object Graph {
   /**
    * This interface converts from the API response into the Graph
    */
-  def fromRates(rates: List[Rate]): Graph = {
+  def apply(rates: List[Rate]): Graph = {
 
     def getNeighbours(currency: Currency, rates: List[Rate]): GraphPath = {
       rates

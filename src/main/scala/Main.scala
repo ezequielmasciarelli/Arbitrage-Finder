@@ -1,21 +1,25 @@
-import Graph.{Graph, GraphPath}
+import Graph.GraphPath
 import SwissborgAPI.Currency
+import cats.Applicative
 import cats.data.EitherT
-import cats.effect.{IO, IOApp}
+import cats.effect.std.Console
+import cats.effect.{Async, IO, IOApp}
 import cats.implicits._
 
 object Main extends IOApp.Simple {
 
-  override def run: IO[Unit] = {
+  override def run: IO[Unit] = runF[IO]
+
+  def runF[F[_]: Applicative: Async: Console]: F[Unit] = {
     (for {
       rates <- EitherT(SwissborgAPI.currenciesProgram)
-      graph <- EitherT(IO.pure(Right(Graph.fromRates(rates))): IO[Either[String, Graph]])
-      allPaths <- EitherT(IO.pure(Right(Graph.allNodesPaths(graph))): IO[Either[String, Map[Currency, List[GraphPath]]]])
+      graph <- EitherT.pure[F,String](Graph(rates))
+      allPaths <- EitherT.pure[F,String](Graph.allNodesPaths(graph))
       arbitragePaths = getArbitragePaths(allPaths)
     } yield arbitragePaths).value.flatMap {
-      case Right(value) => IO.println("Arbitrages found!") *> IO.println(value.mkString(","))
-      case Right(value) if value.isEmpty => IO.println("No arbitrages found")
-      case Left(error) => IO.raiseError(new Exception(s"Error while calculating Arbitrage $error"))
+      case Right(value) if value.isEmpty => Console[F].println("No arbitrages found")
+      case Right(value) => Console[F].println("Arbitrages found!") *> Console[F].println(value.mkString(","))
+      case Left(error) => Console[F].println(s"Error while calculating Arbitrage $error")
     }
   }
 

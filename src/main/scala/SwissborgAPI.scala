@@ -1,20 +1,21 @@
-import cats.effect.IO
+import cats.effect.{Async, IO}
 import cats.implicits._
 import io.circe.Decoder
 import org.http4s.circe.jsonOf
 import org.http4s.ember.client.EmberClientBuilder
 
 object SwissborgAPI {
-  type Result[T] = IO[Either[String, T]]
+  type Result[F[_],T] = F[Either[String, T]]
 
   implicit val responseDecoder: Decoder[List[Row]] = for {
     map <- Decoder.decodeMap[String, Double]
     rows = map.map(Row.tupled)
   } yield rows.toList
-  val currenciesProgram: Result[List[Rate]] = EmberClientBuilder.default[IO].build.use { client =>
+
+  def currenciesProgram[F[_]: Async]: Result[F,List[Rate]] = EmberClientBuilder.default[F].build.use { client =>
 
     for {
-      response <- client.expect[List[Row]]("https://api.swissborg.io/v1/challenge/rates")(jsonOf[IO, List[Row]])
+      response <- client.expect[List[Row]]("https://api.swissborg.io/v1/challenge/rates")(jsonOf[F, List[Row]])
       currencies = response.map(_.toRate).sequence
     } yield currencies
   }
