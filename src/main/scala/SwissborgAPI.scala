@@ -5,7 +5,12 @@ import org.http4s.circe.jsonOf
 import org.http4s.ember.client.EmberClientBuilder
 
 object SwissborgAPI {
+  type Result[T] = IO[Either[String, T]]
 
+  implicit val responseDecoder: Decoder[List[Row]] = for {
+    map <- Decoder.decodeMap[String, Double]
+    rows = map.map(Row.tupled)
+  } yield rows.toList
   val currenciesProgram: Result[List[Rate]] = EmberClientBuilder.default[IO].build.use { client =>
 
     for {
@@ -14,14 +19,8 @@ object SwissborgAPI {
     } yield currencies
   }
 
-  implicit val responseDecoder: Decoder[List[Row]] = for {
-    map <- Decoder.decodeMap[String, Double]
-    rows = map.map(Row.tupled)
-  } yield rows.toList
-
-  type Result[T] = IO[Either[String, T]]
-
   case class Currency(value: String)
+
   case class Rate(currencies: (Currency, Currency), rate: Double)
 
   case class Row(currencies: String, rate: Double) {
