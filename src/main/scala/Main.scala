@@ -93,14 +93,15 @@ object Main extends IOApp.Simple {
   val rates: List[Rate] = List(Rate((Currency("ARS"), Currency("USD")), "200"), Rate((Currency("USD"), Currency("ARS")), "0.005"))
 
   def toTree(l: List[Rate]): LazyTree = {
+
+    def getNeighbours(currency: Currency, rates: List[Rate]): List[(String, LazyTree)] = {
+      rates
+        .filter(_.currencies._1 == currency)
+        .map(rate => (rate.rate, LazyTree(rate.currencies._2, getNeighbours(rate.currencies._2, rates))))
+    }
+
     val headCurrency = l.head.currencies._1
     LazyTree(headCurrency, getNeighbours(headCurrency, l))
-  }
-
-  def getNeighbours(currency: Currency, value: List[Rate]): List[(String, LazyTree)] = {
-    value
-      .filter(_.currencies._1 == currency)
-      .map(rate => (rate.rate, LazyTree(rate.currencies._2, getNeighbours(rate.currencies._2, value))))
   }
 
   //val explosion = toTree(rates)
