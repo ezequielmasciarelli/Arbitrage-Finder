@@ -15,7 +15,7 @@ object Graph {
    */
   def fromRates(rates: List[Rate]): Graph = {
 
-    def getNeighbours(currency: Currency, rates: List[Rate]): List[GraphNode] = {
+    def getNeighbours(currency: Currency, rates: List[Rate]): GraphPath = {
       rates
         .filter(_.currencies._1 == currency)
         .map(rate => (rate.rate, Graph(rate.currencies._2, getNeighbours(rate.currencies._2, rates))))
@@ -25,12 +25,12 @@ object Graph {
     Graph(headCurrency, getNeighbours(headCurrency, rates))
   }
 
-  def apply(currency: Currency, neighbours: => List[GraphNode]) = new Graph(currency, neighbours)
+  def apply(currency: Currency, neighbours: => GraphPath) = new Graph(currency, neighbours)
 
   /**
    * Same as path for for all the Nodes in the graph
    */
-  def allNodesPaths(tree: Graph): Map[Currency, List[List[GraphNode]]] = Graph.nodes(tree).view.mapValues(Graph.paths).toMap
+  def allNodesPaths(tree: Graph): Map[Currency, List[GraphPath]] = Graph.nodes(tree).view.mapValues(Graph.paths).toMap
 
   /**
    * Get all the nodes from the graph
@@ -41,9 +41,9 @@ object Graph {
    * The g function is necessary for getting all the paths, since we need to keep track of the current one and apply a special case when we find a loop in the graph
    * however, for every other operation where the paths are not needed (like getting the nodes), this can be replaced by an identity function
    */
-  def fold[A: Semigroup](tree: Graph)(seed: A)(f: Graph => A => A)(g: List[GraphNode] => A => A): A = {
+  def fold[A: Semigroup](tree: Graph)(seed: A)(f: Graph => A => A)(g: GraphPath => A => A): A = {
 
-    def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: List[GraphNode], seed0: A, isHead: Boolean): A = {
+    def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: GraphPath, seed0: A, isHead: Boolean): A = {
       if (tree.currency == tail.currency && !isHead) g(currentPath)(seed0)
       else f(tail)(tail.neighbours.map {
         case (exchange, childTree) =>
@@ -58,10 +58,10 @@ object Graph {
   /**
    * Gets all the possible paths between a node and itself
    */
-  def paths(tree: Graph): List[List[GraphNode]] = fold(tree)(List.empty[List[GraphNode]])(_ => identity)(list => seed => seed ++ List(list))
+  def paths(tree: Graph): List[GraphPath] = fold(tree)(List.empty[GraphPath])(_ => identity)(list => seed => seed ++ List(list))
 
-  class Graph(currency0: Currency, neighbours0: => List[GraphNode]) {
-    lazy val neighbours: List[GraphNode] = neighbours0
+  class Graph(currency0: Currency, neighbours0: => GraphPath) {
+    lazy val neighbours: GraphPath = neighbours0
     lazy val currency: Currency = currency0
   }
 
