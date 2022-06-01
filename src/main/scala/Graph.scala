@@ -1,5 +1,5 @@
 import SwissborgAPI.{Currency, Rate}
-import cats.Semigroup
+import cats.{Monoid, Semigroup}
 
 object Graph {
 
@@ -30,12 +30,15 @@ object Graph {
   /**
    * Get all the nodes from the graph
    */
-  def vertexes(graph: Graph): Map[Currency, Graph] = fold(graph)(Map.empty[Currency, Graph])(c => seed => if (seed.contains(c.currency)) seed else seed + (c.currency -> c))(_ => identity)(_ ++ _)
+  def vertexes(graph: Graph): Map[Currency, Graph] = reduce[Map[Currency, Graph]](graph)(c => seed => if (seed.contains(c.currency)) seed else seed + (c.currency -> c))(_ => identity)(new Monoid[Map[Currency,Graph]] {
+    override def empty: Map[Currency, Graph] = Map.empty
+    override def combine(x: Map[Currency, Graph], y: Map[Currency, Graph]): Map[Currency, Graph] = x ++ y
+  })
 
   /**
    * Gets all the possible paths between a node and itself
    */
-  def paths(graph: Graph): List[GraphPath] = fold(graph)(List.empty[GraphPath])(_ => identity)(list => seed => seed ++ List(list))
+  def paths(graph: Graph): List[GraphPath] = reduce[List[GraphPath]](graph)(_ => identity)(list => seed => seed ++ List(list))
 
   /**
    * Same as path for for all the Nodes in the graph
@@ -45,24 +48,24 @@ object Graph {
   /**
    * Get all the currencies, used only on the tests
    */
-  def currencies(graph: Graph): Set[Currency] = fold(graph)(Set.empty[Currency])(c => seed => seed + c.currency)(_ => identity)
+  def currencies(graph: Graph): Set[Currency] = reduce[Set[Currency]](graph)(c => seed => seed + c.currency)(_ => identity)
 
   /**
    * The g function is necessary for getting all the paths, since we need to keep track of the current one and apply a special case when we find a loop in the graph
    * however, for every other operation where the paths are not needed (like getting the nodes), this can be replaced by an identity function
    */
-  def fold[A: Semigroup](graph: Graph)(seed: A)(f: Graph => A => A)(g: GraphPath => A => A): A = {
+  def reduce[A: Monoid](graph: Graph)(f: Graph => A => A)(g: GraphPath => A => A): A = {
 
-    def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: GraphPath, seed0: A, isHead: Boolean): A = {
-      if (graph.currency == tail.currency && !isHead) g(currentPath)(seed0)
+    def foldAux(tail: Graph, alreadyVisited: List[Currency], currentPath: GraphPath, isHead: Boolean): A = {
+      if (graph.currency == tail.currency && !isHead) g(currentPath)(Monoid[A].empty)
       else f(tail)(tail.neighbours.map {
         case (exchange, childGraph) =>
-          if (alreadyVisited.contains(childGraph.currency)) seed
-          else foldAux(childGraph, alreadyVisited ++ List(childGraph.currency), currentPath ++ List((exchange, childGraph)), seed0, isHead = false)
+          if (alreadyVisited.contains(childGraph.currency)) Monoid[A].empty
+          else foldAux(childGraph, alreadyVisited ++ List(childGraph.currency), currentPath ++ List((exchange, childGraph)), isHead = false)
       }.reduce(Semigroup[A].combine))
     }
 
-    foldAux(graph, List.empty, List((1, graph)), seed, isHead = true)
+    foldAux(graph, List.empty, List((1, graph)), isHead = true)
   }
 
   /** *
